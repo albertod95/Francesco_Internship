@@ -13,14 +13,20 @@ traffic_ldv = pd.read_excel('C:/Users/Francesco/Desktop/internship/hourlytraffic
 #traffic.index = pd.to_datetime(traffic.index, format='%Y%m%d%H%M')
 traffic_ldv.index = pd.to_datetime(traffic_ldv.index,utc = True)
 traffic_ldv.fillna(0, inplace = True)
+
 stations = pd.read_excel('C:/Users/Francesco/Desktop/internship/hourlytraffic_ldv.xlsx', sheet_name = "Stations", header = [0], index_col = 0)
 stations = stations.apply(np.floor)
-s = [0,1,2,3,4]
-stations = stations.reindex(s)
+
+#s = [0,1,2,3,4]
+#stations = stations.reindex(s)
 stretches = pd.read_excel('C:/Users/Francesco/Desktop/internship/hourlytraffic_ldv.xlsx', sheet_name = "Stretches", header = [0], index_col = 0) 
-traffic_hdv = pd.read_excel(r'C:/Users/Francesco/Desktop/internship/hourlytraffic_hdv.xlsx', index_col = 0)
+
+traffic_hdv = pd.read_excel('C:/Users/Francesco/Desktop/internship/hourlytraffic_hdv.xlsx', index_col = 0)
 traffic_hdv.index = pd.to_datetime(traffic_ldv.index,utc = True)
 traffic_hdv.fillna(0, inplace = True)
+
+nodes_position = pd.DataFrame(data=stretches.loc[:,'end']) #data frame of spatial position of nodes along the highway
+nodes_position = nodes_position.drop([48])
 
 #%% Alberto  
 traffic_ldv = pd.read_excel('G:/Mi unidad/FuChar/Internship - Francesco/Coding/Data/hourlytraffic_ldv.xlsx', sheet_name = "Traffic", header = [0], index_col = 0)
@@ -57,7 +63,6 @@ SoC_low = 0.2
 # nodes_position = pd.DataFrame(data=stretches.loc[:,'end']) #data frame of spatial position of nodes along the highway
 # nodes_position = nodes_position.drop([48])
 
-# !!!!!!!! ERROR: until -2 not last one. How does it change the code afterward? Check!! probably 34 nodes. Data frame of spatial position of nodes along the highway
 #%%
 def get_node_traffic(traffic):
     ''' Calculate nodes traffic from traffic flows on stretches
@@ -83,17 +88,12 @@ def get_node_traffic(traffic):
     nodes_out = nodes_out.apply(np.floor)
     return nodes_in
 
-
-#plt.figure(figsize=(15,5))
-#plt.plot(nodes_in.index[0:24], nodes_in[0][0:24])
-#.iloc[[0:24],[0]]
-#plt.plot(nodes['date'][0:24], nodes['exit B'][0:24])
-#plt.show()
 #%%
 nodes_in_hdv = get_node_traffic(traffic = traffic_hdv)
-nodes_in_ldv = get_node_traffic(traffic = traffic_ldv)
-#%% t_recharge = pd.DataFrame(0, index=traffic.index, columns=stations.index)
-
+nodes_in_ldv = get_node_traffic(traffic = traffic_ldv)#%% t_recharge = pd.DataFrame(0, index=traffic.index, columns=stations.index)
+#%%
+stations
+#%%
 
 def get_demand_static(p_ev, nodes_in, traffic, stations, hours, ml_ev, v, p_charge):
     ''' Calculate for each hour and for each station the energy requested, plus the charging time that vehicles are taking to complete their charging cycle
@@ -109,14 +109,13 @@ def get_demand_static(p_ev, nodes_in, traffic, stations, hours, ml_ev, v, p_char
     
     #Time needs to be filled with empty lists
     for i in range(hours):
-        for j in range(5):
+        for j in range(6):
             t_charged.iloc[i,j] = []
     t_charged
     
      # Question: How many of the total EVs are charging? EV_charging(time)/EV_in !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     nodes_in_ev = nodes_in*p_ev #traffic flow ev's data frame
     nodes_in_ev = nodes_in_ev.apply(np.floor) #round up (defect) 
-    
         
     for i in range (nodes): #nodes
 
@@ -129,10 +128,36 @@ def get_demand_static(p_ev, nodes_in, traffic, stations, hours, ml_ev, v, p_char
 
                 E_charged = 0 #energy charged to the vehicle at the beginning is equal to 0
                 
+                SoC_start_high = rd.uniform(0.6,0.8) #if vehicle is starting his journey in the first half of the day -> higher SoC  
+                SoC_start_low = rd.uniform(0.3,0.5) #if vehicle is starting his journey in the second half of the day -> lower SoC 
+                        
+            # HDV distance is higher compared to normal cars
+
+                # if j%12:
+                #     if j%24:
+                #         SoC_start = SoC_start_low
+                #     else:
+                #         SoC_start = SoC_start_high
+                # else:
+                #     if j%3:
+                #         if j%6:
+                #             SoC_start = SoC_start_low
+                #         else:
+                #             SoC_start_high
+                #     else:    
+                SoC_start = rd.choice([SoC_start_high, SoC_start_low])
+                     
+
+                    
+            #random parameters from: F. H. Malik and M. Lehtonen, “Analysis of power network loading due to fast charging of Electric Vehicles on highways” 
+            #     SoC_start_high = rd.uniform(0.6,0.8) #if vehicle is starting his journey in the first half of the day -> higher SoC  
+            #     SoC_start_low = rd.uniform(0.3,0.5) #if vehicle is starting his journey in the second half of the day -> lower SoC 
+            #     SoC_start = rd.choice([SoC_start_high, SoC_start_low])
+                #print(SoC_start)
             # HDV distance is higher compared to normal cars
             #random parametform(0.2,0.9) #20-90%, F. H. Malik and M. Lehtonen, “Analysis of power network loading due to fast charging of Electric Vehicles on highways” 
                 d_ev_east = rd.uniform(25,120) #km total distance of the trip on the highway on east direction (positive) - values to be reviewed  
-                SoC_start = rd.uniform(0.2,0.9) #20-90%, F. H. Malik and M. Lehtonen, “Analysis of power network loading due to fast charging of Electric 
+                # SoC_start = rd.uniform(0.2,0.9) #20-90%, F. H. Malik and M. Lehtonen, “Analysis of power network loading due to fast charging of Electric 
                 d_ev_west = rd.uniform(-25,-120) #km total distance of the trip on the highway on west direction (negative)
                 d_ev = rd.choice([d_ev_east, d_ev_west]) #we chose a random value between the west or east direction journey
                 bat_cap = rd.uniform(15,25) #kWh, F. H. Malik and M. Lehtonen, “Analysis of power network loading due to fast charging of Electric Vehicles on highways” 
@@ -215,7 +240,7 @@ def get_demand_static(p_ev, nodes_in, traffic, stations, hours, ml_ev, v, p_char
 # In[309]:
     
 t1 = time.time() 
-e_stations_ldv, t_charged_ldv, nodes_in_ev = get_demand_static(p_ev = 0.1, nodes_in = nodes_in_ldv, traffic = traffic_ldv, stations = stations, hours = 100,  p_charge = p_ldv, ml_ev = 5, v = v_ldv)
+e_stations_ldv, t_charged_ldv, nodes_in_ev = get_demand_static(p_ev = 0.1, nodes_in = nodes_in_ldv, traffic = traffic_ldv, stations = stations, hours = 8760,  p_charge = p_ldv, ml_ev = 5, v = v_ldv)
 # e_stations_hdv, t_charged_hdv = get_demand_static(p_ev = 0.1, traffic = traffic_hdv, stations = stations, hours = 100,  p_charge = p_hdv, ml_ev = m_hdv, v = v_hdv)
 # e_stations, t_charged, E_charged = get_demand_static_ldv()
 t2 = time.time()
@@ -245,12 +270,21 @@ def n_ev_chg():
             # pct_charging 
     return count
 print("Number of elements in the list: ", n_ev_chg())
-# %% visualization section
-energy_daily = e_stations.groupby(e_stations.index.strftime("%m%d")).mean() #calculate the daily average for all the stations
+
+hourly_ev = np.sum(nodes_in_ev, axis=1)
+hourly_ev_pd = pd.Series(data=hourly_ev, index=traffic_ldv.index)
+np.floor(hourly_ev_pd)
+
+percentage_charging_hour = EV_rec/hourly_ev_pd
+#%%
+t_charged_ldv
+#%%
+# # %% visualization section
+energy_daily = e_stations_ldv.groupby(e_stations_ldv.index.strftime("%m%d")).mean() #calculate the daily average for all the stations
 energy_daily
 
 #yearly average for each station
-e_stations.mean().plot(kind='bar', xticks=[0, 1, 2, 3, 4], rot=0, xlim=5) 
+e_stations_ldv.mean().plot(kind='bar', xticks=[0, 1, 2, 3, 4], rot=0, xlim=5) 
 plt.ylabel('Yearly Average Energy [kWh]')
 plt.xlabel('Stations')
 plt.grid(True)
@@ -306,3 +340,5 @@ percentage_charging_daily
 
 # %%
 percentage_charging_daily.plot(use_index=True, figsize=[30,10], title='daily')
+
+# %%
